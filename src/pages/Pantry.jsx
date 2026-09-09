@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import { listAllIngredients } from "@/lib/mealdb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Combobox } from "@/components/ui/combobox";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 
 const CATEGORIES = [
@@ -24,6 +26,7 @@ export default function Pantry() {
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: "", quantity: "", unit: "", category: CATEGORIES[0] });
+  const [ingredientOptions, setIngredientOptions] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +40,9 @@ export default function Pantry() {
         else setItems(data);
         setLoading(false);
       });
+    listAllIngredients().then((names) => {
+      if (!cancelled) setIngredientOptions(names);
+    });
     return () => {
       cancelled = true;
     };
@@ -86,13 +92,17 @@ export default function Pantry() {
       >
         <div className="col-span-2 space-y-1.5">
           <Label htmlFor="item-name">Item</Label>
-          <Input
+          <Combobox
             id="item-name"
-            placeholder="e.g. Chicken thighs"
+            placeholder="e.g. Chicken"
             value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            onChange={(name) => setForm((f) => ({ ...f, name }))}
+            options={ingredientOptions}
             required
           />
+          <p className="text-xs text-muted-foreground">
+            Pick from the list so recipes can match it exactly — you can still type your own if it's not there.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="item-quantity">Quantity</Label>
