@@ -1,6 +1,9 @@
-import React from "react";
-import { ExternalLink, Youtube } from "lucide-react";
+import React, { useState } from "react";
+import { ExternalLink, Youtube, Flame, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
+import { rollRarity } from "@/lib/ranks";
 
 function matches(ingredientName, pantryNames) {
   const needle = ingredientName.trim().toLowerCase();
@@ -9,10 +12,35 @@ function matches(ingredientName, pantryNames) {
 }
 
 export default function RecipeCard({ recipe, pantryNames }) {
+  const { user } = useAuth();
+  const [logging, setLogging] = useState(false);
+  const [drop, setDrop] = useState(null);
+  const [logError, setLogError] = useState("");
+
   const total = recipe.ingredients.length;
   const have = recipe.ingredients.filter((i) => matches(i.name, pantryNames)).length;
   const missing = total - have;
   const canMake = total > 0 && missing === 0;
+
+  const handleCook = async () => {
+    setLogging(true);
+    setLogError("");
+    const rarity = rollRarity();
+    const { error } = await supabase.from("cook_logs").insert({
+      user_id: user.id,
+      meal_id: recipe.id,
+      meal_title: recipe.title,
+      meal_thumbnail: recipe.thumbnail || null,
+      rarity: rarity.key,
+      xp: rarity.xp,
+    });
+    setLogging(false);
+    if (error) {
+      setLogError("Couldn't log that cook. Try again.");
+      return;
+    }
+    setDrop(rarity);
+  };
 
   return (
     <details className="overflow-hidden rounded-xl border border-border bg-card">
@@ -42,7 +70,7 @@ export default function RecipeCard({ recipe, pantryNames }) {
         {recipe.instructions && (
           <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{recipe.instructions}</p>
         )}
-        <div className="mt-3 flex gap-4 text-xs">
+        <div className="mt-3 flex items-center gap-4 text-xs">
           {recipe.source && (
             <a
               href={recipe.source}
@@ -65,7 +93,28 @@ export default function RecipeCard({ recipe, pantryNames }) {
               Video
             </a>
           )}
+          <button
+            type="button"
+            onClick={handleCook}
+            disabled={logging}
+            className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          >
+            {logging ? <Loader2 className="w-3 h-3 animate-spin" /> : <Flame className="w-3 h-3" />}
+            I cooked this
+          </button>
         </div>
+        {logError && <p className="mt-2 text-xs text-destructive">{logError}</p>}
+        {drop && (
+          <div
+            className={cn(
+              "mt-3 flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm",
+              drop.bgClass
+            )}
+          >
+            <span className={cn("font-semibold", drop.textClass)}>{drop.label} drop!</span>
+            <span className="text-muted-foreground">+{drop.xp} XP</span>
+          </div>
+        )}
       </div>
     </details>
   );
