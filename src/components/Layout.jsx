@@ -3,19 +3,19 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import FlameMark from "@/components/FlameMark";
-import { LogOut } from "lucide-react";
+import { LogOut, Refrigerator, ChefHat } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { to: "/pantry", label: "Pantry" },
-  { to: "/recipes", label: "Recipes" },
+  { to: "/pantry", label: "Pantry", icon: Refrigerator },
+  { to: "/recipes", label: "Recipes", icon: ChefHat },
 ];
 
 export default function Layout() {
   const { logout } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <FlameMark className="h-8 w-8" />
@@ -26,25 +26,28 @@ export default function Layout() {
           Log out
         </Button>
       </header>
-      <nav className="flex gap-1 border-b border-border px-6">
+
+      <main className="flex-1 pb-20">
+        <Outlet />
+      </main>
+
+      <nav className="fixed inset-x-0 bottom-0 flex border-t border-border bg-card">
         {TABS.map((tab) => (
           <NavLink
             key={tab.to}
             to={tab.to}
             className={({ isActive }) =>
               cn(
-                "-mb-px border-b-2 px-4 py-3 text-sm font-medium transition-colors",
-                isActive
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                "flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors",
+                isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )
             }
           >
+            <tab.icon className="h-5 w-5" />
             {tab.label}
           </NavLink>
         ))}
       </nav>
-      <Outlet />
     </div>
   );
 }

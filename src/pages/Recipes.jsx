@@ -1,13 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Plus, X, Trash2, Loader2, ChefHat } from "lucide-react";
+import { findRecipesForPantry } from "@/lib/mealdb";
+import { Loader2, ExternalLink, Youtube } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const emptyIngredient = () => ({ name: "", quantity: "", unit: "" });
 
 function matches(ingredientName, pantryNames) {
   const needle = ingredientName.trim().toLowerCase();
@@ -16,230 +11,148 @@ function matches(ingredientName, pantryNames) {
 }
 
 export default function Recipes() {
-  const { user } = useAuth();
   const [recipes, setRecipes] = useState([]);
   const [pantryNames, setPantryNames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ title: "", instructions: "", ingredients: [emptyIngredient()] });
-
-  const loadData = async () => {
-    const [{ data: recipeData, error: recipeError }, { data: pantryData, error: pantryError }] =
-      await Promise.all([
-        supabase
-          .from("recipes")
-          .select("*, recipe_ingredients(*)")
-          .order("created_at", { ascending: false }),
-        supabase.from("pantry_items").select("name"),
-      ]);
-    if (recipeError) setError(recipeError.message);
-    else if (pantryError) setError(pantryError.message);
-    else {
-      setRecipes(recipeData);
-      setPantryNames(pantryData.map((p) => p.name.trim().toLowerCase()));
-    }
-    setLoading(false);
-  };
 
   useEffect(() => {
-    loadData();
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      setError("");
+      const { data: pantryData, error: pantryError } = await supabase
+        .from("pantry_items")
+        .select("name");
+      if (cancelled) return;
+      if (pantryError) {
+        setError(pantryError.message);
+        setLoading(false);
+        return;
+      }
+      const names = pantryData.map((p) => p.name.trim().toLowerCase());
+      setPantryNames(names);
+
+      try {
+        const found = await findRecipesForPantry(names);
+        if (cancelled) return;
+        found.sort((a, b) => {
+          const haveA = a.ingredients.filter((i) => matches(i.name, names)).length / a.ingredients.length;
+          const haveB = b.ingredients.filter((i) => matches(i.name, names)).length / b.ingredients.length;
+          return haveB - haveA;
+        });
+        setRecipes(found);
+      } catch {
+        if (!cancelled) setError("Couldn't reach the recipe database. Try again in a bit.");
+      }
+      if (!cancelled) setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  const updateIngredient = (index, field, value) => {
-    setForm((f) => ({
-      ...f,
-      ingredients: f.ingredients.map((ing, i) => (i === index ? { ...ing, [field]: value } : ing)),
-    }));
-  };
-
-  const addIngredientRow = () => {
-    setForm((f) => ({ ...f, ingredients: [...f.ingredients, emptyIngredient()] }));
-  };
-
-  const removeIngredientRow = (index) => {
-    setForm((f) => ({ ...f, ingredients: f.ingredients.filter((_, i) => i !== index) }));
-  };
-
-  const handleAdd = async (e) => {
-    e.preventDefault();
-    const ingredients = form.ingredients.filter((ing) => ing.name.trim());
-    if (!form.title.trim() || ingredients.length === 0) return;
-    setSaving(true);
-    setError("");
-
-    const { data: recipe, error: recipeError } = await supabase
-      .from("recipes")
-      .insert({ user_id: user.id, title: form.title.trim(), instructions: form.instructions.trim() || null })
-      .select()
-      .single();
-
-    if (recipeError) {
-      setSaving(false);
-      setError(recipeError.message);
-      return;
-    }
-
-    const { error: ingredientsError } = await supabase.from("recipe_ingredients").insert(
-      ingredients.map((ing) => ({
-        recipe_id: recipe.id,
-        name: ing.name.trim(),
-        quantity: ing.quantity ? Number(ing.quantity) : null,
-        unit: ing.unit.trim() || null,
-      }))
-    );
-
-    setSaving(false);
-    if (ingredientsError) {
-      setError(ingredientsError.message);
-      return;
-    }
-
-    setForm({ title: "", instructions: "", ingredients: [emptyIngredient()] });
-    loadData();
-  };
-
-  const handleDelete = async (id) => {
-    setRecipes((prev) => prev.filter((r) => r.id !== id));
-    const { error: deleteError } = await supabase.from("recipes").delete().eq("id", id);
-    if (deleteError) setError(deleteError.message);
-  };
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-12">
       <h1 className="font-display text-2xl font-bold tracking-tight">Recipes</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        See what you can already make with what's in your pantry.
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">Real recipes, ranked by what you already have.</p>
 
       {error && <div className="mt-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
 
-      <form onSubmit={handleAdd} className="mt-6 space-y-4 rounded-2xl border border-border bg-card p-5">
-        <div className="space-y-1.5">
-          <Label htmlFor="recipe-title">Recipe name</Label>
-          <Input
-            id="recipe-title"
-            placeholder="e.g. Chicken stir fry"
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            required
-          />
+      {loading ? (
+        <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Finding recipes for your pantry...
         </div>
-
-        <div className="space-y-2">
-          <Label>Ingredients</Label>
-          {form.ingredients.map((ing, i) => (
-            <div key={i} className="flex gap-2">
-              <Input
-                placeholder="Ingredient"
-                value={ing.name}
-                onChange={(e) => updateIngredient(i, "name", e.target.value)}
-                className="flex-1"
-              />
-              <Input
-                type="number"
-                min="0"
-                step="any"
-                placeholder="Qty"
-                value={ing.quantity}
-                onChange={(e) => updateIngredient(i, "quantity", e.target.value)}
-                className="w-20"
-              />
-              <Input
-                placeholder="Unit"
-                value={ing.unit}
-                onChange={(e) => updateIngredient(i, "unit", e.target.value)}
-                className="w-20"
-              />
-              <button
-                type="button"
-                onClick={() => removeIngredientRow(i)}
-                disabled={form.ingredients.length === 1}
-                className="text-muted-foreground hover:text-destructive disabled:opacity-30"
-                aria-label="Remove ingredient"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-          <Button type="button" variant="outline" size="sm" onClick={addIngredientRow}>
-            <Plus className="w-4 h-4" />
-            Add ingredient
-          </Button>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="recipe-instructions">Instructions (optional)</Label>
-          <textarea
-            id="recipe-instructions"
-            placeholder="How you make it..."
-            value={form.instructions}
-            onChange={(e) => setForm((f) => ({ ...f, instructions: e.target.value }))}
-            rows={3}
-            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </div>
-
-        <Button type="submit" className="w-full" disabled={saving}>
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChefHat className="w-4 h-4" />}
-          Save recipe
-        </Button>
-      </form>
-
-      <div className="mt-8 space-y-3">
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading recipes...</p>
-        ) : recipes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No recipes yet. Add your first one above.</p>
-        ) : (
-          recipes.map((recipe) => {
-            const total = recipe.recipe_ingredients.length;
-            const have = recipe.recipe_ingredients.filter((ing) => matches(ing.name, pantryNames)).length;
+      ) : pantryNames.length === 0 ? (
+        <p className="mt-8 text-sm text-muted-foreground">
+          Your pantry is empty. Add a few items and recipes you can make will show up here.
+        </p>
+      ) : recipes.length === 0 ? (
+        <p className="mt-8 text-sm text-muted-foreground">
+          No matches yet — try adding a few common ingredients like chicken, rice, or eggs.
+        </p>
+      ) : (
+        <div className="mt-8 space-y-3">
+          {recipes.map((recipe) => {
+            const total = recipe.ingredients.length;
+            const have = recipe.ingredients.filter((i) => matches(i.name, pantryNames)).length;
             const canMake = total > 0 && have === total;
             return (
-              <details key={recipe.id} className="rounded-xl border border-border bg-card px-4 py-3">
-                <summary className="flex cursor-pointer list-none items-center justify-between">
-                  <span className="font-medium">{recipe.title}</span>
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={cn(
-                        "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                        canMake ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
-                      )}
-                    >
-                      {have}/{total} you have
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleDelete(recipe.id);
-                      }}
-                      className="text-muted-foreground hover:text-destructive"
-                      aria-label={`Delete ${recipe.title}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+              <details key={recipe.id} className="overflow-hidden rounded-xl border border-border bg-card">
+                <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
+                  {recipe.thumbnail && (
+                    <img
+                      src={recipe.thumbnail}
+                      alt=""
+                      className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                    />
+                  )}
+                  <span className="flex-1 font-medium">{recipe.title}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      canMake ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
+                    )}
+                  >
+                    {have}/{total} you have
+                  </span>
                 </summary>
-                <ul className="mt-3 space-y-1 text-sm">
-                  {recipe.recipe_ingredients.map((ing) => (
-                    <li
-                      key={ing.id}
-                      className={matches(ing.name, pantryNames) ? "text-foreground" : "text-muted-foreground"}
-                    >
-                      {matches(ing.name, pantryNames) ? "✓" : "✗"} {ing.name}
-                      {ing.quantity ? ` — ${ing.quantity}${ing.unit ? " " + ing.unit : ""}` : ""}
-                    </li>
-                  ))}
-                </ul>
-                {recipe.instructions && (
-                  <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{recipe.instructions}</p>
-                )}
+                <div className="border-t border-border px-4 py-3">
+                  <ul className="space-y-1 text-sm">
+                    {recipe.ingredients.map((ing, i) => (
+                      <li
+                        key={i}
+                        className={matches(ing.name, pantryNames) ? "text-foreground" : "text-muted-foreground"}
+                      >
+                        {matches(ing.name, pantryNames) ? "✓" : "✗"} {ing.name}
+                        {ing.measure ? ` — ${ing.measure}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                  {recipe.instructions && (
+                    <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">
+                      {recipe.instructions}
+                    </p>
+                  )}
+                  <div className="mt-3 flex gap-4 text-xs">
+                    {recipe.source && (
+                      <a
+                        href={recipe.source}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Source
+                      </a>
+                    )}
+                    {recipe.youtube && (
+                      <a
+                        href={recipe.youtube}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        <Youtube className="w-3 h-3" />
+                        Video
+                      </a>
+                    )}
+                  </div>
+                </div>
               </details>
             );
-          })
-        )}
-      </div>
+          })}
+          <p className="pt-2 text-center text-xs text-muted-foreground">
+            Recipe data from{" "}
+            <a href="https://www.themealdb.com" target="_blank" rel="noreferrer" className="hover:underline">
+              TheMealDB
+            </a>
+          </p>
+        </div>
+      )}
     </div>
   );
 }
