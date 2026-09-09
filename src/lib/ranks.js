@@ -1,37 +1,15 @@
-// Rarity drop table rolled each time a user logs a cook, and the competitive
-// rank ladder that cumulative XP climbs. Colors map to the ember/amber/gold
-// tokens in index.css - gold is reserved for the top tiers and legendary+
-// drops, since index.css calls it out as "reserved for rarity/holo moments".
+// Cosmetic drop rarity (separate from recipe difficulty - see lib/difficulty.js
+// for what actually grants XP). Colors map to the ember/amber/gold tokens in
+// index.css - gold is reserved for legendary+ drops per index.css's own
+// "reserved for rarity/holo moments" comment. Which rarities can drop for a
+// given cook is weighted by that recipe's difficulty (lib/cosmetics.js).
 export const RARITIES = [
-  { key: "common", label: "Common", weight: 55, xp: 10, textClass: "text-muted-foreground", bgClass: "bg-secondary" },
-  { key: "uncommon", label: "Uncommon", weight: 27, xp: 25, textClass: "text-primary", bgClass: "bg-primary/15" },
-  { key: "rare", label: "Rare", weight: 13, xp: 60, textClass: "text-accent", bgClass: "bg-accent/15" },
-  { key: "legendary", label: "Legendary", weight: 4, xp: 200, textClass: "text-gold", bgClass: "bg-gold/15" },
-  {
-    key: "mythic",
-    label: "Mythic",
-    weight: 1,
-    xp: 500,
-    textClass: "text-gold",
-    bgClass: "bg-gold/25",
-    holo: true,
-  },
+  { key: "common", label: "Common", textClass: "text-muted-foreground", bgClass: "bg-secondary" },
+  { key: "uncommon", label: "Uncommon", textClass: "text-primary", bgClass: "bg-primary/15" },
+  { key: "rare", label: "Rare", textClass: "text-accent", bgClass: "bg-accent/15" },
+  { key: "legendary", label: "Legendary", textClass: "text-gold", bgClass: "bg-gold/15" },
+  { key: "mythic", label: "Mythic", textClass: "text-gold", bgClass: "bg-gold/25", holo: true },
 ];
-
-const NON_MYTHIC = RARITIES.filter((r) => r.key !== "mythic");
-
-// Mythic only drops for players who've already reached Champion or Legend -
-// everyone else's roll is re-weighted across the other four tiers.
-export function rollRarity({ allowMythic = false } = {}) {
-  const pool = allowMythic ? RARITIES : NON_MYTHIC;
-  const totalWeight = pool.reduce((sum, r) => sum + r.weight, 0);
-  let roll = Math.random() * totalWeight;
-  for (const rarity of pool) {
-    if (roll < rarity.weight) return rarity;
-    roll -= rarity.weight;
-  }
-  return pool[0];
-}
 
 export function rarityByKey(key) {
   return RARITIES.find((r) => r.key === key) || RARITIES[0];

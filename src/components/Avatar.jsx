@@ -1,7 +1,11 @@
-import React from "react";
+import React, { Suspense, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { RoundedBox, Outlines } from "@react-three/drei";
+import * as THREE from "three";
 import { STARTERS, getCosmetic } from "@/lib/cosmetics";
 
-const SKIN = "#caa27a";
+const SKIN = "#d9a876";
+const OUTLINE = "#241a12";
 
 function resolve(equipped, slot) {
   const key = equipped?.[slot];
@@ -9,140 +13,136 @@ function resolve(equipped, slot) {
   return STARTERS[slot] || null;
 }
 
+// A 4-step cel-shade gradient so MeshToonMaterial reads as flat/cartoon
+// rather than photoreal - the low-poly, "game avatar" look this is going for.
+// One shared texture reused by every part instead of one per mesh.
+let toonGradient = null;
+function getToonGradient() {
+  if (toonGradient) return toonGradient;
+  const canvas = document.createElement("canvas");
+  canvas.width = 4;
+  canvas.height = 1;
+  const ctx = canvas.getContext("2d");
+  ["#3d3129", "#7a6656", "#b09a86", "#ffffff"].forEach((c, i) => {
+    ctx.fillStyle = c;
+    ctx.fillRect(i, 0, 1, 1);
+  });
+  toonGradient = new THREE.CanvasTexture(canvas);
+  toonGradient.minFilter = THREE.NearestFilter;
+  toonGradient.magFilter = THREE.NearestFilter;
+  return toonGradient;
+}
+
+function Toon({ color, children, outline = true, outlineColor = OUTLINE, thickness = 0.012 }) {
+  const gradientMap = getToonGradient();
+  return (
+    <mesh castShadow receiveShadow>
+      {children}
+      <meshToonMaterial color={color} gradientMap={gradientMap} />
+      {outline && <Outlines thickness={thickness} color={outlineColor} />}
+    </mesh>
+  );
+}
+
 function Hair({ visual }) {
   if (visual.variant === "flame") {
     return (
-      <polygon points="60,2 48,16 52,30 60,34 68,30 72,16" fill={visual.color} />
+      <Toon color={visual.color} outline={false}>
+        <coneGeometry args={[0.3, 0.5, 6]} />
+      </Toon>
     );
   }
-  return <circle cx="60" cy="12" r="9" fill={visual.color} />;
+  return (
+    <group position={[0, 1.98, -0.05]}>
+      <Toon color={visual.color}>
+        <sphereGeometry args={[0.16, 12, 12]} />
+      </Toon>
+    </group>
+  );
 }
 
 function Glasses({ visual }) {
   if (visual.variant === "shades") {
-    return <rect x="44" y="30" width="32" height="9" rx="3" fill={visual.color} />;
+    return (
+      <Toon color={visual.color} outline={false}>
+        <boxGeometry args={[0.46, 0.12, 0.06]} />
+      </Toon>
+    );
   }
   return (
-    <g fill="none" stroke={visual.color} strokeWidth="2.5">
-      <circle cx="51" cy="34" r="6" />
-      <circle cx="69" cy="34" r="6" />
-      <line x1="57" y1="34" x2="63" y2="34" />
-    </g>
+    <group>
+      <mesh position={[-0.13, 0, 0]}>
+        <torusGeometry args={[0.09, 0.018, 8, 20]} />
+        <meshStandardMaterial color={visual.color} />
+      </mesh>
+      <mesh position={[0.13, 0, 0]}>
+        <torusGeometry args={[0.09, 0.018, 8, 20]} />
+        <meshStandardMaterial color={visual.color} />
+      </mesh>
+    </group>
   );
 }
 
 function Jacket({ visual }) {
   if (visual.variant === "apron") {
     return (
-      <g fill={visual.color}>
-        <rect x="40" y="70" width="40" height="48" rx="6" opacity="0.92" />
-        <rect x="52" y="58" width="16" height="14" rx="3" opacity="0.92" />
-      </g>
+      <group position={[0, 0.78, 0.23]}>
+        <Toon color={visual.color}>
+          <boxGeometry args={[0.58, 0.72, 0.05]} />
+        </Toon>
+      </group>
     );
   }
   if (visual.variant === "coat") {
     return (
-      <g fill={visual.color}>
-        <polygon points="34,62 48,62 42,120 30,120" />
-        <polygon points="86,62 72,62 78,120 90,120" />
-      </g>
+      <group position={[0, 0.95, 0]}>
+        <Toon color={visual.color}>
+          <capsuleGeometry args={[0.4, 0.62, 4, 8]} />
+        </Toon>
+      </group>
     );
   }
   // cloak (mythic)
   return (
-    <g fill={visual.color} opacity="0.9">
-      <polygon points="30,58 90,58 96,128 60,116 24,128" />
-    </g>
-  );
-}
-
-function Shirt({ visual }) {
-  return (
-    <g>
-      <rect x="32" y="58" width="56" height="66" rx="16" fill={visual.color} />
-      {visual.variant === "stripes" && (
-        <g stroke="#f4f1ea" strokeWidth="3" opacity="0.8">
-          <line x1="34" y1="74" x2="86" y2="74" />
-          <line x1="34" y1="88" x2="86" y2="88" />
-          <line x1="34" y1="102" x2="86" y2="102" />
-        </g>
-      )}
-    </g>
-  );
-}
-
-function Pants({ visual }) {
-  return (
-    <g fill={visual.color}>
-      <rect x="38" y="124" width="18" height="54" rx="8" />
-      <rect x="64" y="124" width="18" height="54" rx="8" />
-      {visual.variant === "cargo" && (
-        <g fill="#00000022">
-          <rect x="40" y="148" width="12" height="14" rx="2" />
-          <rect x="68" y="148" width="12" height="14" rx="2" />
-        </g>
-      )}
-    </g>
-  );
-}
-
-function Feet({ visual }) {
-  if (!visual) {
-    return (
-      <g fill={SKIN}>
-        <ellipse cx="47" cy="182" rx="9" ry="5" />
-        <ellipse cx="73" cy="182" rx="9" ry="5" />
-      </g>
-    );
-  }
-  if (visual.variant === "boots") {
-    return (
-      <g fill={visual.color}>
-        <rect x="38" y="168" width="18" height="18" rx="4" />
-        <rect x="64" y="168" width="18" height="18" rx="4" />
-      </g>
-    );
-  }
-  if (visual.variant === "clogs") {
-    return (
-      <g fill={visual.color}>
-        <ellipse cx="47" cy="182" rx="11" ry="6" />
-        <ellipse cx="73" cy="182" rx="11" ry="6" />
-      </g>
-    );
-  }
-  // sandals
-  return (
-    <g>
-      <ellipse cx="47" cy="182" rx="10" ry="5" fill={SKIN} />
-      <ellipse cx="73" cy="182" rx="10" ry="5" fill={SKIN} />
-      <g stroke={visual.color} strokeWidth="2">
-        <line x1="42" y1="178" x2="52" y2="178" />
-        <line x1="68" y1="178" x2="78" y2="178" />
-      </g>
-    </g>
+    <group position={[0, 0.7, -0.15]}>
+      <Toon color={visual.color} outlineColor="#8a6a1f">
+        <coneGeometry args={[0.55, 1.05, 5]} />
+      </Toon>
+    </group>
   );
 }
 
 function Accessory({ visual }) {
   if (visual.variant === "toque") {
     return (
-      <g fill={visual.color}>
-        <rect x="46" y="-6" width="28" height="16" rx="4" />
-        <ellipse cx="60" cy="-6" rx="14" ry="8" />
-      </g>
+      <group position={[0, 2.05, -0.03]}>
+        <Toon color={visual.color}>
+          <cylinderGeometry args={[0.19, 0.16, 0.32, 12]} />
+        </Toon>
+        <group position={[0, 0.2, 0]}>
+          <Toon color={visual.color}>
+            <sphereGeometry args={[0.2, 12, 12]} />
+          </Toon>
+        </group>
+      </group>
     );
   }
   // spatula, held beside the right hand
   return (
-    <g stroke={visual.color} strokeWidth="3" fill="none" strokeLinecap="round">
-      <line x1="94" y1="90" x2="94" y2="112" />
-      <rect x="88" y="80" width="12" height="12" rx="2" fill={visual.color} stroke="none" />
-    </g>
+    <group position={[0.62, 0.55, 0.15]} rotation={[0, 0, -0.3]}>
+      <Toon color="#8a8f98">
+        <cylinderGeometry args={[0.018, 0.018, 0.42, 6]} />
+      </Toon>
+      <group position={[0, 0.26, 0]}>
+        <Toon color={visual.color}>
+          <boxGeometry args={[0.16, 0.16, 0.02]} />
+        </Toon>
+      </group>
+    </group>
   );
 }
 
-export default function Avatar({ equipped, size = 160, className, idle = true }) {
+function Character({ equipped }) {
   const hair = resolve(equipped, "hair");
   const glasses = resolve(equipped, "glasses");
   const jacket = resolve(equipped, "jacket");
@@ -151,36 +151,102 @@ export default function Avatar({ equipped, size = 160, className, idle = true })
   const shoes = resolve(equipped, "shoes");
   const accessory = resolve(equipped, "accessory");
 
+  const groupRef = useRef();
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return;
+    const t = clock.elapsedTime;
+    groupRef.current.position.y = Math.sin(t * 1.3) * 0.035;
+    groupRef.current.rotation.y = Math.sin(t * 0.6) * 0.06;
+  });
+
   return (
-    <svg viewBox="0 0 120 200" width={size} height={(size * 200) / 120} className={className} role="img" aria-label="Your character">
-      <g className={idle ? "avatar-idle" : undefined}>
-        {/* arms */}
-        <g fill={SKIN}>
-          <rect x="16" y="66" width="15" height="50" rx="7" />
-          <rect x="89" y="66" width="15" height="50" rx="7" />
-        </g>
-        {pants && <Pants visual={pants.visual} />}
-        {shirt && <Shirt visual={shirt.visual} />}
-        {jacket && (
-          <g className={jacket.rarity === "mythic" ? "avatar-holo" : undefined}>
-            <Jacket visual={jacket.visual} />
-          </g>
+    <group ref={groupRef}>
+      {/* legs */}
+      <group position={[-0.16, 0.42, 0]}>
+        <Toon color={pants.visual.color}>
+          <capsuleGeometry args={[0.14, 0.42, 4, 8]} />
+        </Toon>
+      </group>
+      <group position={[0.16, 0.42, 0]}>
+        <Toon color={pants.visual.color}>
+          <capsuleGeometry args={[0.14, 0.42, 4, 8]} />
+        </Toon>
+      </group>
+
+      {/* feet / shoes */}
+      {["-1", "1"].map((sign) => (
+        <group key={sign} position={[0.16 * Number(sign), 0.08, 0.07]}>
+          <Toon color={shoes ? shoes.visual.color : SKIN}>
+            <RoundedBox args={[0.19, 0.14, 0.3]} radius={0.05} smoothness={2} />
+          </Toon>
+        </group>
+      ))}
+
+      {/* torso / shirt */}
+      <group position={[0, 0.95, 0]}>
+        <Toon color={shirt.visual.color}>
+          <capsuleGeometry args={[0.34, 0.55, 4, 8]} />
+        </Toon>
+      </group>
+
+      {/* arms */}
+      <group position={[-0.52, 0.92, 0]} rotation={[0, 0, 0.12]}>
+        <Toon color={SKIN}>
+          <capsuleGeometry args={[0.1, 0.5, 4, 8]} />
+        </Toon>
+      </group>
+      <group position={[0.52, 0.92, 0]} rotation={[0, 0, -0.12]}>
+        <Toon color={SKIN}>
+          <capsuleGeometry args={[0.1, 0.5, 4, 8]} />
+        </Toon>
+      </group>
+
+      {/* head */}
+      <group position={[0, 1.72, 0]}>
+        <Toon color={SKIN}>
+          <sphereGeometry args={[0.34, 20, 20]} />
+        </Toon>
+        {glasses && (
+          <group position={[0, 0, 0.3]}>
+            <Glasses visual={glasses.visual} />
+          </group>
         )}
-        {/* head */}
-        <circle cx="60" cy="34" r="24" fill={SKIN} />
-        {glasses && <Glasses visual={glasses.visual} />}
-        {hair && (
-          <g className={hair.rarity === "mythic" ? "avatar-holo" : undefined}>
-            <Hair visual={hair.visual} />
-          </g>
-        )}
-        <Feet visual={shoes?.visual} />
-        {accessory && (
-          <g className={accessory.rarity === "mythic" ? "avatar-holo" : undefined}>
-            <Accessory visual={accessory.visual} />
-          </g>
-        )}
-      </g>
-    </svg>
+      </group>
+
+      {hair && <Hair visual={hair.visual} />}
+      {jacket && <Jacket visual={jacket.visual} />}
+      {accessory && <Accessory visual={accessory.visual} />}
+    </group>
+  );
+}
+
+function Fallback({ size }) {
+  return (
+    <div
+      className="flex items-center justify-center rounded-xl bg-secondary/60 text-xs text-muted-foreground"
+      style={{ width: size, height: size * 1.25 }}
+    >
+      Loading character...
+    </div>
+  );
+}
+
+export default function Avatar({ equipped, size = 200, className }) {
+  return (
+    <div className={className} style={{ width: size, height: size * 1.25 }}>
+      <Suspense fallback={<Fallback size={size} />}>
+        <Canvas
+          shadows
+          gl={{ alpha: true, antialias: true }}
+          camera={{ position: [0, 1.35, 3.6], fov: 28 }}
+          dpr={[1, 1.75]}
+        >
+          <ambientLight intensity={0.65} />
+          <directionalLight position={[2, 3, 2]} intensity={1.1} castShadow />
+          <pointLight position={[-2, 1.5, -1]} intensity={0.35} color="#e0762f" />
+          <Character equipped={equipped} />
+        </Canvas>
+      </Suspense>
+    </div>
   );
 }

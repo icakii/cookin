@@ -1,8 +1,38 @@
+import { rarityByKey } from "@/lib/ranks";
+
 // Cosmetic catalog for the avatar. Kept in code rather than the database -
 // user_cosmetics (supabase/004_cosmetics.sql) only stores which catalog keys
 // a player has unlocked. Every item is tied to a TheMealDB category (or
 // "any") so cooking a particular kind of food is what can drop it.
 export const SLOTS = ["hair", "glasses", "jacket", "shirt", "pants", "shoes", "accessory"];
+
+// Harder recipes roll from a better rarity pool for their cosmetic drop -
+// XP itself comes from difficulty directly (lib/difficulty.js), this only
+// shifts the odds of what quality of item you might also walk away with.
+const DIFFICULTY_RARITY_WEIGHTS = {
+  easy: { common: 75, uncommon: 25 },
+  medium: { common: 35, uncommon: 40, rare: 25 },
+  hard: { uncommon: 30, rare: 45, legendary: 25 },
+  expert: { rare: 25, legendary: 55, mythic: 20 },
+};
+
+// Mythic only rolls for players already at Champion rank - otherwise its
+// share of the pool folds into legendary.
+export function rollRarityForDifficulty(difficultyKey, { allowMythic = false } = {}) {
+  const weights = { ...(DIFFICULTY_RARITY_WEIGHTS[difficultyKey] || DIFFICULTY_RARITY_WEIGHTS.easy) };
+  if (!allowMythic && weights.mythic) {
+    weights.legendary = (weights.legendary || 0) + weights.mythic;
+    delete weights.mythic;
+  }
+  const entries = Object.entries(weights);
+  const total = entries.reduce((sum, [, w]) => sum + w, 0);
+  let roll = Math.random() * total;
+  for (const [key, w] of entries) {
+    if (roll < w) return rarityByKey(key);
+    roll -= w;
+  }
+  return rarityByKey(entries[0][0]);
+}
 
 export const STARTERS = {
   shirt: { key: "shirt_starter", slot: "shirt", label: "Brown Shirt", visual: { variant: "solid", color: "#6b4a34" } },

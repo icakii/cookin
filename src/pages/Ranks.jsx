@@ -1,10 +1,38 @@
 import React, { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { RARITIES, rarityByKey, rankProgress, effectiveTier, LEGEND_TIER } from "@/lib/ranks";
 import { fetchLeaderboard, computeGlobalStanding } from "@/lib/leaderboard";
-import { Loader2, Trophy } from "lucide-react";
+import { Loader2, Trophy, Crown, Award, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const PODIUM = {
+  1: {
+    ring: "linear-gradient(135deg, #f7e08a, #d4af37 45%, #8a6a1f)",
+    glow: "0 0 22px 3px rgba(212,175,55,0.55)",
+    icon: Crown,
+    iconClass: "text-[#f0cf5c]",
+    scale: [1, 1.045, 1],
+    duration: 2.2,
+  },
+  2: {
+    ring: "linear-gradient(135deg, #f1f1f1, #bdbdbd 45%, #7d7d7d)",
+    glow: "0 0 16px 2px rgba(200,200,200,0.45)",
+    icon: Award,
+    iconClass: "text-[#d6d6d6]",
+    scale: [1, 1.03, 1],
+    duration: 2.6,
+  },
+  3: {
+    ring: "linear-gradient(135deg, #e7b17d, #b9773f 45%, #6e451f)",
+    glow: "0 0 16px 2px rgba(184,115,51,0.4)",
+    icon: Award,
+    iconClass: "text-[#d99a5f]",
+    scale: [1, 1.03, 1],
+    duration: 2.6,
+  },
+};
 
 function ProgressTab({ logs, tier }) {
   const totalXp = logs.reduce((sum, l) => sum + l.xp, 0);
@@ -115,24 +143,59 @@ function LeaderboardTab({ userId }) {
         Top {board.length} by XP. Reach Champion while in the global top 500 to earn{" "}
         <span className={LEGEND_TIER.tierClass}>Legend</span>.
       </p>
-      {board.map((entry) => (
-        <div
-          key={entry.userId}
-          className={cn(
-            "flex items-center justify-between rounded-xl border px-4 py-2.5",
-            entry.userId === userId ? "border-primary bg-primary/5" : "border-border bg-card"
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <span className="w-8 shrink-0 text-sm font-semibold text-muted-foreground">#{entry.position}</span>
-            <span className="font-medium">{entry.username}</span>
+      {board.map((entry) => {
+        const podium = PODIUM[entry.position];
+        const PodiumIcon = podium?.icon;
+        return (
+          <div
+            key={entry.userId}
+            className={cn(
+              "flex items-center justify-between rounded-xl border px-4 py-2.5",
+              podium && "border-transparent bg-card py-3",
+              !podium && (entry.userId === userId ? "border-primary bg-primary/5" : "border-border bg-card")
+            )}
+            style={podium ? { boxShadow: podium.glow } : undefined}
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-6 shrink-0 text-sm font-semibold text-muted-foreground">#{entry.position}</span>
+              {podium ? (
+                <motion.div
+                  className="relative h-10 w-10 shrink-0 rounded-full p-[2.5px]"
+                  style={{ background: podium.ring }}
+                  animate={{ scale: podium.scale }}
+                  transition={{ duration: podium.duration, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <div className="h-full w-full overflow-hidden rounded-full bg-card">
+                    {entry.avatarUrl ? (
+                      <img src={entry.avatarUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        <UserRound className="h-5 w-5" />
+                      </div>
+                    )}
+                  </div>
+                  <PodiumIcon className={cn("absolute -top-2.5 left-1/2 h-4 w-4 -translate-x-1/2", podium.iconClass)} />
+                </motion.div>
+              ) : (
+                <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-secondary">
+                  {entry.avatarUrl ? (
+                    <img src={entry.avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                      <UserRound className="h-4 w-4" />
+                    </div>
+                  )}
+                </div>
+              )}
+              <span className={cn("font-medium", entry.userId === userId && "text-primary")}>{entry.username}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={cn("text-sm font-semibold", entry.tier.tierClass)}>{entry.tier.name}</span>
+              <span className="text-xs text-muted-foreground">{entry.xp} XP</span>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className={cn("text-sm font-semibold", entry.tier.tierClass)}>{entry.tier.name}</span>
-            <span className="text-xs text-muted-foreground">{entry.xp} XP</span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

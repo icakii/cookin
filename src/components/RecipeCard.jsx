@@ -3,9 +3,10 @@ import { ExternalLink, Youtube, Flame, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
-import { rollRarity, rankProgress } from "@/lib/ranks";
+import { rankProgress } from "@/lib/ranks";
 import { getUserTotalXp } from "@/lib/leaderboard";
-import { rollCosmeticDrop } from "@/lib/cosmetics";
+import { rollCosmeticDrop, rollRarityForDifficulty } from "@/lib/cosmetics";
+import { estimateDifficulty } from "@/lib/difficulty";
 
 function matches(ingredientName, pantryNames) {
   const needle = ingredientName.trim().toLowerCase();
@@ -23,6 +24,7 @@ export default function RecipeCard({ recipe, pantryNames }) {
   const have = recipe.ingredients.filter((i) => matches(i.name, pantryNames)).length;
   const missing = total - have;
   const canMake = total > 0 && missing === 0;
+  const difficulty = estimateDifficulty(recipe);
 
   const handleCook = async () => {
     setLogging(true);
@@ -30,15 +32,16 @@ export default function RecipeCard({ recipe, pantryNames }) {
     try {
       const totalXp = await getUserTotalXp(user.id);
       const allowMythic = rankProgress(totalXp).current.name === "Champion";
-      const rarity = rollRarity({ allowMythic });
+      const rarity = rollRarityForDifficulty(difficulty.key, { allowMythic });
 
       const { error } = await supabase.from("cook_logs").insert({
         user_id: user.id,
         meal_id: recipe.id,
         meal_title: recipe.title,
         meal_thumbnail: recipe.thumbnail || null,
+        difficulty: difficulty.key,
         rarity: rarity.key,
-        xp: rarity.xp,
+        xp: difficulty.xp,
       });
       if (error) throw error;
 
@@ -52,7 +55,7 @@ export default function RecipeCard({ recipe, pantryNames }) {
         await supabase.from("user_cosmetics").insert({ user_id: user.id, cosmetic_key: cosmetic.key });
       }
 
-      setDrop({ rarity, cosmetic });
+      setDrop({ rarity, cosmetic, difficulty });
     } catch {
       setLogError("Couldn't log that cook. Try again.");
     }
@@ -65,7 +68,10 @@ export default function RecipeCard({ recipe, pantryNames }) {
         {recipe.thumbnail && (
           <img src={recipe.thumbnail} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
         )}
-        <span className="flex-1 font-medium">{recipe.title}</span>
+        <span className="flex-1 truncate font-medium">{recipe.title}</span>
+        <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", difficulty.bgClass, difficulty.textClass)}>
+          {difficulty.label}
+        </span>
         <span
           className={cn(
             "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium",
@@ -130,8 +136,8 @@ export default function RecipeCard({ recipe, pantryNames }) {
             )}
           >
             <div className="flex items-center justify-between">
-              <span className={cn("font-semibold", drop.rarity.textClass)}>{drop.rarity.label} drop!</span>
-              <span className="text-muted-foreground">+{drop.rarity.xp} XP</span>
+              <span className={cn("font-semibold", drop.difficulty.textClass)}>{drop.difficulty.label} cook!</span>
+              <span className="text-muted-foreground">+{drop.difficulty.xp} XP</span>
             </div>
             {drop.cosmetic && (
               <p className="text-xs text-muted-foreground">

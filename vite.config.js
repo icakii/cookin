@@ -12,7 +12,11 @@ export default defineConfig({
       srcDir: "src",
       filename: "sw.js",
       injectManifest: {
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // The NSFW model (only fetched if someone uploads a profile picture)
+        // and the three.js/character-viewer bundle are large and optional -
+        // never force every installing user to download them upfront.
+        globIgnores: ["**/vendor-nsfw-*.js", "**/vendor-3d-*.js"],
       },
       includeAssets: ["icons/favicon.svg", "icons/favicon-32.png", "icons/apple-touch-icon.png"],
       manifest: {
@@ -34,6 +38,19 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Stable names for the two heavy/optional vendor bundles so the PWA
+        // config above can reliably glob-ignore them (content hashes alone
+        // aren't matchable ahead of time).
+        manualChunks(id) {
+          if (id.includes("nsfwjs") || id.includes("@tensorflow")) return "vendor-nsfw";
+          if (id.includes("node_modules/three") || id.includes("@react-three")) return "vendor-3d";
+        },
+      },
     },
   },
 });

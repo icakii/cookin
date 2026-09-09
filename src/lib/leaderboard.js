@@ -23,21 +23,22 @@ async function rankedTop500() {
 
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
-    .select("id, username")
+    .select("id, username, avatar_url")
     .in(
       "id",
       top500.map((r) => r.userId)
     );
   if (profilesError) throw profilesError;
 
-  const usernames = new Map(profiles.map((p) => [p.id, p.username]));
+  const byId = new Map(profiles.map((p) => [p.id, p]));
 
   // Everyone in this array is, by construction, in the global top 500 - so
   // effectiveTier can award Legend to whoever among them has hit Champion.
   return top500.map((r, i) => ({
     ...r,
     position: i + 1,
-    username: usernames.get(r.userId) || "A cook",
+    username: byId.get(r.userId)?.username || "A cook",
+    avatarUrl: byId.get(r.userId)?.avatar_url || null,
     tier: effectiveTier(r.xp, true),
   }));
 }
