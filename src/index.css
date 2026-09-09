@@ -58,3 +58,48 @@ body {
 .font-display {
   font-family: var(--font-display);
 }
+
+/* Avatar: a gentle idle bob so the character never sits frozen, and a
+   pulsing gold glow reserved for mythic-rarity cosmetics. */
+@keyframes avatar-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.avatar-idle {
+  animation: avatar-bob 2.6s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+@keyframes avatar-holo {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px hsl(var(--gold) / 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 7px hsl(var(--gold) / 0.95));
+  }
+}
+.avatar-holo {
+  animation: avatar-holo 1.8s ease-in-out infinite;
+}
+
+/* Animated open/close for the custom dropdown (categories, cuisines, etc). */
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scaleY(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+.dropdown-panel {
+  animation: dropdown-in 0.14s ease-out;
+  transform-origin: top center;
+}

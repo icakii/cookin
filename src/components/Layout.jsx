@@ -3,13 +3,14 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import FlameMark from "@/components/FlameMark";
-import { LogOut, Refrigerator, ChefHat, Trophy } from "lucide-react";
+import { LogOut, Refrigerator, ChefHat, Trophy, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { to: "/pantry", label: "Pantry", icon: Refrigerator },
   { to: "/recipes", label: "Recipes", icon: ChefHat },
   { to: "/ranks", label: "Ranks", icon: Trophy },
+  { to: "/profile", label: "Profile", icon: UserCircle },
 ];
 
 export default function Layout() {

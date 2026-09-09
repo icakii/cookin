@@ -3,7 +3,9 @@ import { ExternalLink, Youtube, Flame, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
-import { rollRarity } from "@/lib/ranks";
+import { rollRarity, rankProgress } from "@/lib/ranks";
+import { getUserTotalXp } from "@/lib/leaderboard";
+import { rollCosmeticDrop } from "@/lib/cosmetics";
 
 function matches(ingredientName, pantryNames) {
   const needle = ingredientName.trim().toLowerCase();
@@ -25,21 +27,36 @@ export default function RecipeCard({ recipe, pantryNames }) {
   const handleCook = async () => {
     setLogging(true);
     setLogError("");
-    const rarity = rollRarity();
-    const { error } = await supabase.from("cook_logs").insert({
-      user_id: user.id,
-      meal_id: recipe.id,
-      meal_title: recipe.title,
-      meal_thumbnail: recipe.thumbnail || null,
-      rarity: rarity.key,
-      xp: rarity.xp,
-    });
-    setLogging(false);
-    if (error) {
+    try {
+      const totalXp = await getUserTotalXp(user.id);
+      const allowMythic = rankProgress(totalXp).current.name === "Champion";
+      const rarity = rollRarity({ allowMythic });
+
+      const { error } = await supabase.from("cook_logs").insert({
+        user_id: user.id,
+        meal_id: recipe.id,
+        meal_title: recipe.title,
+        meal_thumbnail: recipe.thumbnail || null,
+        rarity: rarity.key,
+        xp: rarity.xp,
+      });
+      if (error) throw error;
+
+      const { data: unlocked } = await supabase.from("user_cosmetics").select("cosmetic_key").eq("user_id", user.id);
+      const cosmetic = rollCosmeticDrop({
+        category: recipe.category,
+        rarity: rarity.key,
+        unlockedKeys: (unlocked || []).map((u) => u.cosmetic_key),
+      });
+      if (cosmetic) {
+        await supabase.from("user_cosmetics").insert({ user_id: user.id, cosmetic_key: cosmetic.key });
+      }
+
+      setDrop({ rarity, cosmetic });
+    } catch {
       setLogError("Couldn't log that cook. Try again.");
-      return;
     }
-    setDrop(rarity);
+    setLogging(false);
   };
 
   return (
@@ -107,12 +124,21 @@ export default function RecipeCard({ recipe, pantryNames }) {
         {drop && (
           <div
             className={cn(
-              "mt-3 flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm",
-              drop.bgClass
+              "mt-3 space-y-1 rounded-lg border border-border px-3 py-2 text-sm",
+              drop.rarity.bgClass,
+              drop.rarity.holo && "avatar-holo"
             )}
           >
-            <span className={cn("font-semibold", drop.textClass)}>{drop.label} drop!</span>
-            <span className="text-muted-foreground">+{drop.xp} XP</span>
+            <div className="flex items-center justify-between">
+              <span className={cn("font-semibold", drop.rarity.textClass)}>{drop.rarity.label} drop!</span>
+              <span className="text-muted-foreground">+{drop.rarity.xp} XP</span>
+            </div>
+            {drop.cosmetic && (
+              <p className="text-xs text-muted-foreground">
+                Unlocked <span className={cn("font-medium", drop.rarity.textClass)}>{drop.cosmetic.label}</span> for your
+                character
+              </p>
+            )}
           </div>
         )}
       </div>

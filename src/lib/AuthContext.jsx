@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { ensureProfile } from "@/lib/profile";
 
 const AuthContext = createContext();
 
@@ -15,6 +16,7 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(!!session);
       setIsLoadingAuth(false);
       setAuthChecked(true);
+      if (session?.user) ensureProfile(session.user);
     });
 
     const {
@@ -24,6 +26,7 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(!!session);
       setIsLoadingAuth(false);
       setAuthChecked(true);
+      if (session?.user) ensureProfile(session.user);
     });
 
     return () => subscription.unsubscribe();

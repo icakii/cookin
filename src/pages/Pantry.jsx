@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
+import { Select } from "@/components/ui/select";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 
 const CATEGORIES = [
@@ -127,18 +128,12 @@ export default function Pantry() {
         </div>
         <div className="col-span-2 space-y-1.5">
           <Label htmlFor="item-category">Category</Label>
-          <select
+          <Select
             id="item-category"
             value={form.category}
-            onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c} className="bg-card">
-                {c}
-              </option>
-            ))}
-          </select>
+            onChange={(category) => setForm((f) => ({ ...f, category }))}
+            options={CATEGORIES}
+          />
         </div>
         <Button type="submit" className="col-span-2" disabled={adding}>
           {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}

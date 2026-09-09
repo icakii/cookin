@@ -8,6 +8,7 @@ import Register from "@/pages/Register";
 import Pantry from "@/pages/Pantry";
 import Recipes from "@/pages/Recipes";
 import Ranks from "@/pages/Ranks";
+import Profile from "@/pages/Profile";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
               <Route path="/pantry" element={<Pantry />} />
               <Route path="/recipes" element={<Recipes />} />
               <Route path="/ranks" element={<Ranks />} />
+              <Route path="/profile" element={<Profile />} />
             </Route>
           </Route>
 

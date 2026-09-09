@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import {
   findRecipesForPantry,
@@ -12,6 +12,7 @@ import {
 import RecipeCard from "@/components/RecipeCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Loader2, Search } from "lucide-react";
 
 function matches(ingredientName, pantryNames) {
@@ -37,6 +38,10 @@ export default function Recipes() {
   const [area, setArea] = useState("");
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestFocused, setSuggestFocused] = useState(false);
+  const suggestDebounce = useRef(null);
+  const suggestBlurTimeout = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +79,40 @@ export default function Recipes() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (query.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    clearTimeout(suggestDebounce.current);
+    suggestDebounce.current = setTimeout(async () => {
+      try {
+        const results = await searchMealsByName(query.trim());
+        setSuggestions(results.slice(0, 8));
+      } catch {
+        setSuggestions([]);
+      }
+    }, 250);
+    return () => clearTimeout(suggestDebounce.current);
+  }, [query]);
+
+  const selectSuggestion = async (meal) => {
+    setQuery(meal.title);
+    setSuggestions([]);
+    setSearching(true);
+    setError("");
+    try {
+      let results = await searchMealsByName(meal.title);
+      if (category) results = results.filter((r) => r.category === category);
+      if (area) results = results.filter((r) => r.area === area);
+      results.sort((a, b) => missingCount(a, pantryNames) - missingCount(b, pantryNames));
+      setSearchResults(results);
+    } catch {
+      setError("Couldn't reach the recipe database. Try again in a bit.");
+    }
+    setSearching(false);
+  };
 
   const runSearch = async (e) => {
     e?.preventDefault();
@@ -116,45 +155,59 @@ export default function Recipes() {
       <form onSubmit={runSearch} className="mt-6 space-y-3 rounded-2xl border border-border bg-card p-5">
         <p className="text-sm font-medium">Search all recipes</p>
         <div className="flex gap-2">
-          <Input
-            placeholder="Recipe name..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="flex-1"
-          />
+          <div className="relative flex-1">
+            <Input
+              placeholder="Recipe name..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setSuggestFocused(true)}
+              onBlur={() => {
+                suggestBlurTimeout.current = setTimeout(() => setSuggestFocused(false), 100);
+              }}
+              autoComplete="off"
+            />
+            {suggestFocused && suggestions.length > 0 && (
+              <ul className="dropdown-panel absolute z-10 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-input bg-card shadow-soft-lg">
+                {suggestions.map((meal) => (
+                  <li key={meal.id}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        clearTimeout(suggestBlurTimeout.current);
+                        selectSuggestion(meal);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-foreground hover:bg-secondary"
+                    >
+                      {meal.thumbnail && (
+                        <img src={meal.thumbnail} alt="" className="h-7 w-7 shrink-0 rounded object-cover" />
+                      )}
+                      <span className="truncate">{meal.title}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <Button type="submit" disabled={searching}>
             {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
           </Button>
         </div>
         <div className="flex gap-2">
-          <select
+          <Select
+            className="flex-1"
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="" className="bg-card">
-              Any category
-            </option>
-            {categories.map((c) => (
-              <option key={c} value={c} className="bg-card">
-                {c}
-              </option>
-            ))}
-          </select>
-          <select
+            onChange={setCategory}
+            placeholder="Any category"
+            options={[{ value: "", label: "Any category" }, ...categories.map((c) => ({ value: c, label: c }))]}
+          />
+          <Select
+            className="flex-1"
             value={area}
-            onChange={(e) => setArea(e.target.value)}
-            className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="" className="bg-card">
-              Any cuisine
-            </option>
-            {areas.map((a) => (
-              <option key={a} value={a} className="bg-card">
-                {a}
-              </option>
-            ))}
-          </select>
+            onChange={setArea}
+            placeholder="Any cuisine"
+            options={[{ value: "", label: "Any cuisine" }, ...areas.map((a) => ({ value: a, label: a }))]}
+          />
         </div>
       </form>
 
