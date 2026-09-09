@@ -2,9 +2,11 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/lib/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
-import Dashboard from "@/pages/Dashboard";
+import Pantry from "@/pages/Pantry";
+import Recipes from "@/pages/Recipes";
 
 export default function App() {
   return (
@@ -15,7 +17,11 @@ export default function App() {
           <Route path="/register" element={<Register />} />
 
           <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
-            <Route path="/" element={<Dashboard />} />
+            <Route element={<Layout />}>
+              <Route path="/" element={<Navigate to="/pantry" replace />} />
+              <Route path="/pantry" element={<Pantry />} />
+              <Route path="/recipes" element={<Recipes />} />
+            </Route>
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
