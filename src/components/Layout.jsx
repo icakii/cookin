@@ -1,8 +1,9 @@
 import React from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import FlameMark from "@/components/FlameMark";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LogOut, Refrigerator, ChefHat, Trophy, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ const TABS = [
 
 export default function Layout() {
   const { logout } = useAuth();
+  const location = useLocation();
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -30,7 +32,9 @@ export default function Layout() {
       </header>
 
       <main className="flex-1 pb-20">
-        <Outlet />
+        <ErrorBoundary key={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 flex border-t border-border bg-card">

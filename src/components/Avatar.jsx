@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { RoundedBox, Outlines } from "@react-three/drei";
 import * as THREE from "three";
 import { STARTERS, getCosmetic } from "@/lib/cosmetics";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const SKIN = "#d9a876";
 const OUTLINE = "#241a12";
@@ -234,19 +235,27 @@ function Fallback({ size }) {
 export default function Avatar({ equipped, size = 200, className }) {
   return (
     <div className={className} style={{ width: size, height: size * 1.25 }}>
-      <Suspense fallback={<Fallback size={size} />}>
-        <Canvas
-          shadows
-          gl={{ alpha: true, antialias: true }}
-          camera={{ position: [0, 1.35, 3.6], fov: 28 }}
-          dpr={[1, 1.75]}
-        >
-          <ambientLight intensity={0.65} />
-          <directionalLight position={[2, 3, 2]} intensity={1.1} castShadow />
-          <pointLight position={[-2, 1.5, -1]} intensity={0.35} color="#e0762f" />
-          <Character equipped={equipped} />
-        </Canvas>
-      </Suspense>
+      <ErrorBoundary
+        fallback={() => (
+          <div className="flex h-full w-full items-center justify-center rounded-xl bg-secondary/60 p-3 text-center text-xs text-muted-foreground">
+            Couldn't render your character. Try reloading.
+          </div>
+        )}
+      >
+        <Suspense fallback={<Fallback size={size} />}>
+          <Canvas
+            shadows
+            gl={{ alpha: true, antialias: true }}
+            camera={{ position: [0, 1.35, 3.6], fov: 28 }}
+            dpr={[1, 1.75]}
+          >
+            <ambientLight intensity={0.65} />
+            <directionalLight position={[2, 3, 2]} intensity={1.1} castShadow />
+            <pointLight position={[-2, 1.5, -1]} intensity={0.35} color="#e0762f" />
+            <Character equipped={equipped} />
+          </Canvas>
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 }
