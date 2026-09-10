@@ -1,6 +1,6 @@
 import React, { Suspense, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { RoundedBox, Outlines } from "@react-three/drei";
+import { Outlines } from "@react-three/drei";
 import * as THREE from "three";
 import { STARTERS, getCosmetic } from "@/lib/cosmetics";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -178,7 +178,7 @@ function Character({ equipped }) {
       {["-1", "1"].map((sign) => (
         <group key={sign} position={[0.16 * Number(sign), 0.08, 0.07]}>
           <Toon color={shoes ? shoes.visual.color : SKIN}>
-            <RoundedBox args={[0.19, 0.14, 0.3]} radius={0.05} smoothness={2} />
+            <boxGeometry args={[0.19, 0.14, 0.3]} />
           </Toon>
         </group>
       ))}
