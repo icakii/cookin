@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { updateProfile } from "@/lib/profile";
 import { getUserTotalXp, computeGlobalStanding } from "@/lib/leaderboard";
-import { rankProgress, effectiveTier, rarityByKey } from "@/lib/ranks";
+import { rankProgress, effectiveTier, rarityByKey, RARITIES } from "@/lib/ranks";
 import { SLOTS, STARTERS, COSMETICS, cosmeticsForSlot } from "@/lib/cosmetics";
 import Avatar from "@/components/Avatar";
 import ProfilePicture from "@/components/ProfilePicture";
@@ -253,6 +253,20 @@ export default function Profile() {
       </p>
 
       <Drawer open={closetOpen} onClose={() => setClosetOpen(false)} title="Closet">
+        <div className="mb-6 grid grid-cols-5 gap-1.5">
+          {RARITIES.map((r) => {
+            const count = COSMETICS.filter((c) => c.rarity === r.key && unlockedKeys.includes(c.key)).length;
+            const total = COSMETICS.filter((c) => c.rarity === r.key).length;
+            return (
+              <div key={r.key} className="rounded-lg border border-border bg-secondary/40 p-2 text-center">
+                <p className={cn("text-sm font-bold", r.textClass)}>
+                  {count}/{total}
+                </p>
+                <p className="text-[10px] text-muted-foreground">{r.label}</p>
+              </div>
+            );
+          })}
+        </div>
         <div className="space-y-6">
           {SLOTS.map((slot) => {
             const starter = STARTERS[slot];

@@ -2,10 +2,40 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
-import { RARITIES, rarityByKey, rankProgress, effectiveTier, LEGEND_TIER } from "@/lib/ranks";
+import { RANKS, rankProgress, effectiveTier, LEGEND_TIER } from "@/lib/ranks";
+import { DIFFICULTIES, difficultyByKey } from "@/lib/difficulty";
 import { fetchLeaderboard, computeGlobalStanding } from "@/lib/leaderboard";
-import { Loader2, Trophy, Crown, Award, UserRound } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
+import { Loader2, Trophy, Crown, Award, UserRound, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function RankInfoModal({ open, onClose }) {
+  return (
+    <Modal open={open} onClose={onClose} title="How ranks work">
+      <p className="text-sm text-muted-foreground">
+        Cooking a recipe grants fixed XP based on its difficulty (see the Recipes tab for that breakdown). XP adds up
+        to a rank:
+      </p>
+      <div className="mt-3 space-y-1.5">
+        {RANKS.map((r) => (
+          <div key={r.name} className="flex items-center justify-between rounded-lg border border-border px-3 py-1.5">
+            <span className={cn("text-sm font-semibold", r.tierClass)}>{r.name}</span>
+            <span className="text-xs text-muted-foreground">{r.minXp.toLocaleString()} XP</span>
+          </div>
+        ))}
+        <div className="flex items-center justify-between rounded-lg border border-border px-3 py-1.5">
+          <span className={cn("text-sm font-semibold", LEGEND_TIER.tierClass)}>{LEGEND_TIER.name}</span>
+          <span className="text-xs text-muted-foreground">Champion + top 500 globally</span>
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Rank itself doesn't hand out cosmetics directly - those drop from cooking, weighted by that recipe's
+        difficulty (see the Closet in your Profile). The one exception: Mythic-rarity drops only become possible
+        once you've reached Champion.
+      </p>
+    </Modal>
+  );
+}
 
 const PODIUM = {
   1: {
@@ -37,9 +67,9 @@ const PODIUM = {
 function ProgressTab({ logs, tier }) {
   const totalXp = logs.reduce((sum, l) => sum + l.xp, 0);
   const { next, percent, xpToNext } = rankProgress(totalXp);
-  const tally = RARITIES.map((r) => ({
-    ...r,
-    count: logs.filter((l) => l.rarity === r.key).length,
+  const tally = DIFFICULTIES.map((d) => ({
+    ...d,
+    count: logs.filter((l) => l.difficulty === d.key).length,
   }));
 
   return (
@@ -57,11 +87,11 @@ function ProgressTab({ logs, tier }) {
         </p>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {tally.map((r) => (
-          <div key={r.key} className={cn("rounded-xl border border-border bg-card p-3 text-center", r.holo && "avatar-holo")}>
-            <p className={cn("text-lg font-bold", r.textClass)}>{r.count}</p>
-            <p className="text-xs text-muted-foreground">{r.label}</p>
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {tally.map((d) => (
+          <div key={d.key} className="rounded-xl border border-border bg-card p-3 text-center">
+            <p className={cn("text-lg font-bold", d.textClass)}>{d.count}</p>
+            <p className="text-xs text-muted-foreground">{d.label}</p>
           </div>
         ))}
       </div>
@@ -75,7 +105,7 @@ function ProgressTab({ logs, tier }) {
         ) : (
           <div className="mt-2 space-y-2">
             {logs.map((log) => {
-              const rarity = rarityByKey(log.rarity);
+              const difficulty = difficultyByKey(log.difficulty);
               return (
                 <div
                   key={log.id}
@@ -91,7 +121,7 @@ function ProgressTab({ logs, tier }) {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={cn("text-sm font-semibold", rarity.textClass)}>{rarity.label}</p>
+                    <p className={cn("text-sm font-semibold", difficulty.textClass)}>{difficulty.label}</p>
                     <p className="text-xs text-muted-foreground">+{log.xp} XP</p>
                   </div>
                 </div>
@@ -207,6 +237,7 @@ export default function Ranks() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("progress");
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,8 +270,21 @@ export default function Ranks() {
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="font-display text-2xl font-bold tracking-tight">Ranks</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Every cook earns XP and a chance at a rare drop.</p>
+      <div className="flex items-center gap-1.5">
+        <h1 className="font-display text-2xl font-bold tracking-tight">Ranks</h1>
+        <button
+          type="button"
+          onClick={() => setInfoOpen(true)}
+          className="text-muted-foreground hover:text-foreground"
+          aria-label="How ranks work"
+        >
+          <Info className="h-4 w-4" />
+        </button>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Every cook earns XP by difficulty, plus a chance at a cosmetic drop.
+      </p>
+      <RankInfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
 
       <div className="mt-5 flex gap-1 rounded-lg bg-secondary p-1 text-sm font-medium">
         <button
