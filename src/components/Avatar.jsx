@@ -16,10 +16,13 @@ const HEAD_Y = 1.24;
 const TORSO_Y = 0.68;
 const TORSO_R = 0.3;
 const TORSO_LEN = 0.14;
+const TORSO_BOTTOM = TORSO_Y - (TORSO_LEN / 2 + TORSO_R); // 0.31 - legs must stay below this
 const ARM_Y = 0.62;
 const ARM_X = 0.34;
-const HIP_Y = 0.42;
-const LEG_Y = 0.24;
+const HIP_Y = TORSO_BOTTOM;
+const LEG_R = 0.11;
+const LEG_LEN = 0.08;
+const LEG_Y = 0.15; // leg spans ~0 to ~0.30, clear of the torso above it
 const LEG_X = 0.14;
 const FOOT_Y = 0.04;
 // Model spans world y ~0 (feet) to ~1.6 (head top) - shift it so its visual
@@ -75,35 +78,50 @@ function GroundShadow() {
 
 // Face/Glasses are rendered as children of the head group, so these
 // positions are local to the head's own center (0,0,0), not world space.
-function Face() {
+function Eye({ x }) {
   return (
-    <group position={[0, 0.02, HEAD_R * 0.93]}>
-      <mesh position={[-0.13, 0, 0]}>
-        <sphereGeometry args={[0.045, 10, 10]} />
-        <meshStandardMaterial color={EYE} roughness={0.3} />
+    <group position={[x, 0, 0]}>
+      <mesh>
+        <sphereGeometry args={[0.075, 14, 14]} />
+        <meshStandardMaterial color={EYE} roughness={0.15} />
       </mesh>
-      <mesh position={[0.13, 0, 0]}>
-        <sphereGeometry args={[0.045, 10, 10]} />
-        <meshStandardMaterial color={EYE} roughness={0.3} />
+      {/* glossy highlight so the eye doesn't read as a flat dot */}
+      <mesh position={[0.022, 0.024, 0.058]}>
+        <sphereGeometry args={[0.018, 8, 8]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.1} />
       </mesh>
     </group>
   );
 }
 
+function Face() {
+  return (
+    <group position={[0, 0.01, HEAD_R * 0.95]}>
+      <Eye x={-0.15} />
+      <Eye x={0.15} />
+    </group>
+  );
+}
+
+const HEAD_TOP = HEAD_Y + HEAD_R;
+
 function Hair({ visual }) {
   if (visual.variant === "flame") {
+    // Cone sits base-down on top of the head, not centered inside it.
+    const coneHeight = 0.42;
     return (
-      <group position={[0, HEAD_Y + HEAD_R * 0.85, -0.04]}>
+      <group position={[0, HEAD_TOP - 0.02 + coneHeight / 2, 0]}>
         <Toon color={visual.color}>
-          <coneGeometry args={[0.26, 0.42, 6]} />
+          <coneGeometry args={[0.22, coneHeight, 6]} />
         </Toon>
       </group>
     );
   }
+  // Bun sits mostly outside the head sphere, anchored near its top-back.
   return (
-    <group position={[0, HEAD_Y + HEAD_R * 0.55, -0.14]}>
+    <group position={[0, HEAD_TOP - 0.04, -0.18]}>
       <Toon color={visual.color}>
-        <sphereGeometry args={[0.2, 14, 14]} />
+        <sphereGeometry args={[0.16, 14, 14]} />
       </Toon>
     </group>
   );
@@ -299,7 +317,7 @@ function Character({ equipped }) {
       <group position={[-LEG_X, HIP_Y, 0]} ref={legLRef}>
         <group position={[0, LEG_Y - HIP_Y, 0]}>
           <Toon color={pants.visual.color}>
-            <capsuleGeometry args={[0.12, 0.2, 4, 8]} />
+            <capsuleGeometry args={[LEG_R, LEG_LEN, 4, 8]} />
           </Toon>
         </group>
         <group position={[0, FOOT_Y - HIP_Y, 0.06]}>
@@ -311,7 +329,7 @@ function Character({ equipped }) {
       <group position={[LEG_X, HIP_Y, 0]} ref={legRRef}>
         <group position={[0, LEG_Y - HIP_Y, 0]}>
           <Toon color={pants.visual.color}>
-            <capsuleGeometry args={[0.12, 0.2, 4, 8]} />
+            <capsuleGeometry args={[LEG_R, LEG_LEN, 4, 8]} />
           </Toon>
         </group>
         <group position={[0, FOOT_Y - HIP_Y, 0.06]}>
